@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #if OPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE
 #if defined(__APPLE__) || defined(__NetBSD__)
 #include <util.h>
@@ -212,12 +213,30 @@ void HdlcInterface::Read(void)
     }
     else if (rval == 0)
     {
+        // A TTY opened non-blocking with VMIN=0 returns 0 from read() when no data is pending,
+        // e.g. a PTY bridged to a network RCP by socat. Only a reported hang-up is a disconnect.
+        VerifyOrExit(IsDisconnected(mSockFd));
         DieNowWithMessage("RCP device disconnected (EOF)", OT_EXIT_FAILURE);
     }
     else if ((errno != EAGAIN) && (errno != EWOULDBLOCK) && (errno != EINTR))
     {
         DieNow(OT_EXIT_ERROR_ERRNO);
     }
+
+exit:
+    return;
+}
+
+bool HdlcInterface::IsDisconnected(int aFd)
+{
+    struct pollfd pollFd = {aFd, POLLIN, 0};
+
+    if (!isatty(aFd))
+    {
+        return true;
+    }
+
+    return (poll(&pollFd, 1, 0) > 0) && ((pollFd.revents & (POLLHUP | POLLERR | POLLNVAL)) != 0);
 }
 
 void HdlcInterface::Decode(const uint8_t *aBuffer, uint16_t aLength) { mHdlcDecoder.Decode(aBuffer, aLength); }

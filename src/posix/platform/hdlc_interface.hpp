@@ -175,6 +175,20 @@ private:
     void Read(void);
 
     /**
+     * Indicates whether a zero-byte read on a file descriptor means the RCP is disconnected.
+     *
+     * A TTY opened non-blocking with VMIN=0 returns zero from read() when no data is pending, so for
+     * a TTY only a reported hang-up or error counts as a disconnection. Any other descriptor type
+     * (for example, a socket) is treated as disconnected.
+     *
+     * @param[in] aFd  The file descriptor that returned zero from read().
+     *
+     * @retval TRUE   The RCP is disconnected.
+     * @retval FALSE  No data was pending; the RCP is still connected.
+     */
+    static bool IsDisconnected(int aFd);
+
+    /**
      * Waits for the socket file descriptor associated with the HDLC interface to become writable within
      * `kMaxWaitTime` interval.
      *
